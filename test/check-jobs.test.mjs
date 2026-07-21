@@ -123,6 +123,29 @@ test("monitor creates a quiet baseline then reports only unseen roles", async ()
   }
 });
 
+test("manual test alert sends exactly one current role", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "ohsu-test-alert-"));
+  const statePath = join(directory, "seen.json");
+  const alertPath = join(directory, "alert.md");
+  const html = page([
+    card({ id: "101", title: "RN, Pediatric ICU" }),
+    card({ id: "100", title: "RN, Acute Care" }),
+  ]);
+
+  try {
+    await writeFile(statePath, '{"initialized":true,"seen":["100","101"]}\n');
+    const result = await runMonitor({
+      statePath,
+      alertPath,
+      sendTestAlert: true,
+      fetchImpl: async () => htmlResponse(html),
+    });
+    assert.deepEqual(result.newJobs.map((job) => job.id), ["101"]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("README section shows an empty-state message", () => {
   assert.match(buildListingsSection([]), /No matching RN openings/);
 });

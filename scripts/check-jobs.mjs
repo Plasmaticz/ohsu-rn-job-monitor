@@ -172,14 +172,14 @@ export async function runMonitor({
   newJobsPath,
   readmePath,
   actionsOutputPath,
-  alertCurrent = false,
+  sendTestAlert = false,
   fetchImpl = fetch,
 }) {
   const previous = await readState(statePath);
   const jobs = await fetchJobs(fetchImpl);
   const seen = new Set(previous.seen);
   const unseen = jobs.filter((job) => !seen.has(job.id));
-  const newJobs = alertCurrent ? jobs : previous.initialized ? unseen : [];
+  const newJobs = sendTestAlert ? jobs.slice(0, 1) : previous.initialized ? unseen : [];
 
   for (const job of jobs) seen.add(job.id);
   const nextState = { initialized: true, seen: [...seen].sort() };
@@ -208,7 +208,7 @@ export async function runMonitor({
       state_changed: stateChanged,
       readme_changed: readmeChanged,
       repo_changed: stateChanged || readmeChanged,
-      baseline_created: !previous.initialized && !alertCurrent,
+      baseline_created: !previous.initialized && !sendTestAlert,
     },
     actionsOutputPath,
   );
@@ -229,12 +229,12 @@ function parseArgs(args) {
     newJobsPath: undefined,
     readmePath: "README.md",
     actionsOutputPath: process.env.GITHUB_OUTPUT,
-    alertCurrent: false,
+    sendTestAlert: false,
   };
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
-    if (arg === "--alert-current") options.alertCurrent = true;
+    if (arg === "--send-test-alert") options.sendTestAlert = true;
     else if (arg === "--state") options.statePath = args[++index];
     else if (arg === "--alert-file") options.alertPath = args[++index];
     else if (arg === "--new-jobs-file") options.newJobsPath = args[++index];

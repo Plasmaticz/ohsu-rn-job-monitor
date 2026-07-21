@@ -5,8 +5,8 @@ on:
     - cron: "2-57/5 * * * *"
   workflow_dispatch:
     inputs:
-      send_current_jobs:
-        description: Send alerts for all current roles
+      send_test_alert:
+        description: Send one current role as a simulated new-role alert
         required: false
         default: false
         type: boolean
@@ -39,11 +39,11 @@ jobs:
       - name: Check OHSU jobs
         id: monitor
         env:
-          ALERT_CURRENT: ${{ inputs.send_current_jobs || 'false' }}
+          SEND_TEST_ALERT: ${{ inputs.send_test_alert || 'false' }}
         run: |
           extra_args=""
-          if [ "$ALERT_CURRENT" = "true" ]; then
-            extra_args="--alert-current"
+          if [ "$SEND_TEST_ALERT" = "true" ]; then
+            extra_args="--send-test-alert"
           fi
           node scripts/check-jobs.mjs \
             --state data/seen_jobs.json \
