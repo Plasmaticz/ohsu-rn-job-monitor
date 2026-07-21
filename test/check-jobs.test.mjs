@@ -22,7 +22,6 @@ function card({
   location = "US-OR-Portland",
   department = "Medical ICU",
   positionType = "Regular Full-Time",
-  newGrad = "Yes",
 }) {
   return `
     <li class="iCIMS_JobCardItem">
@@ -32,7 +31,7 @@ function card({
       </div>
       <div class="iCIMS_JobHeaderTag"><dt>Position Type</dt><dd>${positionType}</dd></div>
       <div class="iCIMS_JobHeaderTag"><dt>Posting Department</dt><dd>${department}</dd></div>
-      <div class="iCIMS_JobHeaderTag"><dt>Available for New Grads</dt><dd>${newGrad}</dd></div>
+      <div class="iCIMS_JobHeaderTag"><dt>Available for New Grads</dt><dd>Unreliable value</dd></div>
       <div class="iCIMS_JobHeaderTag"><dt>Requisition ID</dt><dd>2026-${id}</dd></div>
     </li>`;
 }
@@ -59,16 +58,29 @@ test("parser extracts RN card fields and ignores unrelated titles", () => {
   assert.equal(parsed.jobs.length, 1);
   assert.equal(parsed.jobs[0].title, "RN, Critical Care & Float Pool");
   assert.equal(parsed.jobs[0].department, "Medical ICU");
-  assert.equal(parsed.jobs[0].newGrad, "Yes");
+  assert.equal("newGrad" in parsed.jobs[0], false);
   assert.equal(parsed.jobs[0].requisitionId, "2026-40465");
   assert.equal(parsed.jobs[0].url.includes("in_iframe"), false);
 });
 
-test("fetcher follows every search page and removes duplicate IDs", async () => {
+test("parser accepts OHSU's valid no-results page", () => {
+  assert.deepEqual(
+    parseJobsPage("<main>Sorry, no jobs were found that match your search criteria.</main>"),
+    { jobs: [], totalPages: 1 },
+  );
+});
+
+test("fetcher combines both keyword searches and removes duplicate IDs", async () => {
   const requests = [];
   const jobs = await fetchJobs(async (url) => {
     requests.push(String(url));
+    const term = url.searchParams.get("searchKeyword");
     const secondPage = url.searchParams.get("pr") === "1";
+    if (term === "RN New Grad") {
+      return htmlResponse(
+        page([card({ id: "101", title: "Registered Nurse, Clinic" })]),
+      );
+    }
     return htmlResponse(
       secondPage
         ? page([card({ id: "101", title: "Registered Nurse, Clinic" })], 2, 2)
@@ -76,8 +88,10 @@ test("fetcher follows every search page and removes duplicate IDs", async () => 
     );
   });
 
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 3);
   assert.deepEqual(jobs.map((job) => job.id), ["100", "101"]);
+  assert.deepEqual(jobs[0].matchedSearches, ["RN Resident"]);
+  assert.deepEqual(jobs[1].matchedSearches, ["RN Resident", "RN New Grad"]);
 });
 
 test("monitor creates a quiet baseline then reports only unseen roles", async () => {
@@ -151,17 +165,23 @@ test("README section shows an empty-state message", () => {
 });
 
 test("new Discord alerts are embedded and notify everyone", () => {
-  const job = parseJobsPage(page([card({ id: "100", title: "RN, Acute Care" })])).jobs[0];
+  const job = {
+    ...parseJobsPage(page([card({ id: "100", title: "RN, Acute Care" })])).jobs[0],
+    matchedSearches: ["RN Resident"],
+  };
   const [payload] = buildNewRolePayloads([job]);
   assert.match(payload.content, /@everyone/);
   assert.match(payload.content, /\*\*NEW ROLE\*\*/);
   assert.deepEqual(payload.allowed_mentions, { parse: ["everyone"] });
   assert.equal(payload.embeds[0].title, "RN, Acute Care");
-  assert.equal(payload.embeds[0].fields[2].value, "Yes");
+  assert.equal(payload.embeds[0].fields[2].value, "RN Resident");
 });
 
 test("daily Discord digest batches roles without mass mentions", () => {
-  const job = parseJobsPage(page([card({ id: "100", title: "RN, Acute Care" })])).jobs[0];
+  const job = {
+    ...parseJobsPage(page([card({ id: "100", title: "RN, Acute Care" })])).jobs[0],
+    matchedSearches: ["RN New Grad"],
+  };
   const payloads = buildDailyDigestPayloads(
     Array.from({ length: 9 }, (_, index) => ({ ...job, id: String(index) })),
   );
@@ -172,7 +192,10 @@ test("daily Discord digest batches roles without mass mentions", () => {
 
 test("Discord sender waits for webhook confirmation", async () => {
   const requests = [];
-  const job = parseJobsPage(page([card({ id: "100", title: "RN, Acute Care" })])).jobs[0];
+  const job = {
+    ...parseJobsPage(page([card({ id: "100", title: "RN, Acute Care" })])).jobs[0],
+    matchedSearches: ["RN Resident"],
+  };
   await sendDiscordJobs(
     "https://discord.com/api/webhooks/example/token",
     [job],

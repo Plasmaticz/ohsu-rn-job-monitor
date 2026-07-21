@@ -22,7 +22,11 @@ export function buildJobEmbed(job, { isNew = false } = {}) {
     fields: [
       { name: "Location", value: clean(job.location), inline: true },
       { name: "Department", value: clean(job.department), inline: true },
-      { name: "New grads", value: clean(job.newGrad), inline: true },
+      {
+        name: "Matched search",
+        value: clean(job.matchedSearches?.join(", ")),
+        inline: true,
+      },
       { name: "Position type", value: clean(job.positionType), inline: true },
       { name: "Requisition", value: clean(job.requisitionId), inline: true },
     ],

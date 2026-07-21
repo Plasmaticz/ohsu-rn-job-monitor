@@ -4,8 +4,11 @@ import { pathToFileURL } from "node:url";
 
 import * as cheerio from "cheerio";
 
-export const SEARCH_URL =
-  "https://nursingcareers-ohsu.icims.com/jobs/search?searchKeyword=RN";
+const SEARCH_BASE_URL = "https://nursingcareers-ohsu.icims.com/jobs/search";
+export const SEARCHES = ["RN Resident", "RN New Grad"].map((term) => ({
+  term,
+  url: `${SEARCH_BASE_URL}?searchKeyword=${encodeURIComponent(term)}`,
+}));
 const TITLE_PATTERN = /\b(?:RN|Registered Nurse)\b/i;
 const LISTINGS_START = "<!-- OHSU-JOBS:START -->";
 const LISTINGS_END = "<!-- OHSU-JOBS:END -->";
@@ -15,16 +18,20 @@ function clean(value) {
 }
 
 function directJobUrl(value) {
-  const url = new URL(value, SEARCH_URL);
+  const url = new URL(value, SEARCH_BASE_URL);
   url.searchParams.delete("in_iframe");
   return url.toString();
 }
 
 export function parseJobsPage(html) {
   const $ = cheerio.load(html);
-  if ($(".iCIMS_JobsTable").length === 0) {
+  const noResults = /Sorry, no jobs were found that match your search criteria/i.test(
+    $("body").text(),
+  );
+  if ($(".iCIMS_JobsTable").length === 0 && !noResults) {
     throw new Error("OHSU search returned an unexpected page");
   }
+  if (noResults) return { jobs: [], totalPages: 1 };
 
   const header = clean($(".iCIMS_SearchResultsHeader").text());
   const totalPages = Number(header.match(/Page\s+\d+\s+of\s+(\d+)/i)?.[1] ?? 1);
@@ -57,7 +64,6 @@ export function parseJobsPage(html) {
       requisitionId: fields.get("requisition id") ?? id,
       department: fields.get("posting department") ?? "Not listed",
       positionType: fields.get("position type") ?? "Not listed",
-      newGrad: fields.get("available for new grads") ?? "Not listed",
       url: directJobUrl(href),
     });
   });
@@ -65,8 +71,8 @@ export function parseJobsPage(html) {
   return { jobs, totalPages: Math.max(1, totalPages || 1) };
 }
 
-async function fetchPage(page, fetchImpl) {
-  const url = new URL(SEARCH_URL);
+async function fetchPage(search, page, fetchImpl) {
+  const url = new URL(search.url);
   url.searchParams.set("in_iframe", "1");
   if (page > 0) url.searchParams.set("pr", String(page));
 
@@ -82,13 +88,26 @@ async function fetchPage(page, fetchImpl) {
 }
 
 export async function fetchJobs(fetchImpl = fetch) {
-  const first = await fetchPage(0, fetchImpl);
-  const allJobs = [...first.jobs];
-  for (let page = 1; page < Math.min(first.totalPages, 20); page += 1) {
-    allJobs.push(...(await fetchPage(page, fetchImpl)).jobs);
-  }
+  const jobsById = new Map();
 
-  return [...new Map(allJobs.map((job) => [job.id, job])).values()];
+  for (const search of SEARCHES) {
+    const first = await fetchPage(search, 0, fetchImpl);
+    const searchJobs = [...first.jobs];
+    for (let page = 1; page < Math.min(first.totalPages, 20); page += 1) {
+      searchJobs.push(...(await fetchPage(search, page, fetchImpl)).jobs);
+    }
+
+    for (const job of searchJobs) {
+      const existing = jobsById.get(job.id);
+      jobsById.set(job.id, {
+        ...(existing ?? job),
+        matchedSearches: [
+          ...new Set([...(existing?.matchedSearches ?? []), search.term]),
+        ],
+      });
+    }
+  }
+  return [...jobsById.values()];
 }
 
 async function readState(statePath) {
@@ -108,14 +127,15 @@ export function buildAlert(jobs) {
   const noun = jobs.length === 1 ? "role" : "roles";
   const sections = jobs.map(
     (job) =>
-      `## [${job.title}](${job.url})\n\n- Location: ${job.location}\n- Department: ${job.department}\n- Position type: ${job.positionType}\n- Available for new grads: ${job.newGrad}\n- Requisition: ${job.requisitionId}`,
+      `## [${job.title}](${job.url})\n\n- Location: ${job.location}\n- Department: ${job.department}\n- Position type: ${job.positionType}\n- Matched search: ${job.matchedSearches.join(", ")}\n- Requisition: ${job.requisitionId}`,
   );
 
   return [
     `# ${jobs.length} new OHSU RN ${noun}`,
     "",
     ...sections.flatMap((section) => [section, ""]),
-    `Source: [OHSU RN job search](${SEARCH_URL})`,
+    "Sources:",
+    ...SEARCHES.map((search) => `- [OHSU ${search.term} search](${search.url})`),
     "",
     `_Checked ${new Date().toISOString()}_`,
   ].join("\n");
@@ -130,7 +150,7 @@ export function buildListingsSection(jobs) {
   const rows = jobs.length
     ? jobs.map(
         (job) =>
-          `| [${escapeTableCell(job.title)}](${job.url}) | ${escapeTableCell(job.location)} | ${escapeTableCell(job.department)} | ${escapeTableCell(job.newGrad)} | ${escapeTableCell(job.requisitionId)} |`,
+          `| [${escapeTableCell(job.title)}](${job.url}) | ${escapeTableCell(job.location)} | ${escapeTableCell(job.department)} | ${escapeTableCell(job.matchedSearches.join(", "))} | ${escapeTableCell(job.requisitionId)} |`,
       )
     : ["| No matching RN openings are currently listed. |  |  |  |  |"];
 
@@ -138,11 +158,11 @@ export function buildListingsSection(jobs) {
     LISTINGS_START,
     `**${jobs.length} current ${noun}**`,
     "",
-    "| Position | Location | Department | New grads | Requisition |",
+    "| Position | Location | Department | Matched search | Requisition |",
     "| --- | --- | --- | --- | --- |",
     ...rows,
     "",
-    `[View the full OHSU RN search](${SEARCH_URL})`,
+    SEARCHES.map((search) => `[${search.term}](${search.url})`).join(" | "),
     LISTINGS_END,
   ].join("\n");
 }
