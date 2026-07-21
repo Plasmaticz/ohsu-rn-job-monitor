@@ -1,0 +1,38 @@
+name: Send daily OHSU RN job digest
+
+on:
+  schedule:
+    - cron: "12 16 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ohsu-rn-daily-discord
+  cancel-in-progress: true
+
+jobs:
+  send-digest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Fetch current OHSU jobs
+        run: node scripts/fetch-current-jobs.mjs "$RUNNER_TEMP/current_jobs.json"
+
+      - name: Send Discord digest
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: node scripts/send-discord.mjs daily "$RUNNER_TEMP/current_jobs.json"

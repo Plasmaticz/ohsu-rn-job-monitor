@@ -1,0 +1,16 @@
+{
+  "name": "ohsu-rn-job-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check-jobs.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "cheerio": "1.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
