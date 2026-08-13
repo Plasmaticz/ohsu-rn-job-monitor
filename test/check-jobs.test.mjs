@@ -190,6 +190,15 @@ test("daily Discord digest batches roles without mass mentions", () => {
   assert.deepEqual(payloads[0].allowed_mentions, { parse: [] });
 });
 
+test("empty daily Discord digest sends a no-roles embed", () => {
+  const [payload] = buildDailyDigestPayloads([]);
+
+  assert.match(payload.content, /Current OHSU RN Roles/);
+  assert.equal(payload.embeds.length, 1);
+  assert.equal(payload.embeds[0].title, "No roles available :( Come back tomorrow");
+  assert.deepEqual(payload.allowed_mentions, { parse: [] });
+});
+
 test("Discord sender waits for webhook confirmation", async () => {
   const requests = [];
   const job = {

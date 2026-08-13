@@ -46,7 +46,15 @@ export function buildDailyDigestPayloads(jobs) {
   if (jobs.length === 0) {
     return [
       {
-        content: "# Current OHSU RN Roles\nNo matching RN openings are currently listed.",
+        content: "# Current OHSU RN Roles",
+        embeds: [
+          {
+            title: "No roles available :( Come back tomorrow",
+            description: "No matching RN openings are currently listed.",
+            color: DAILY_DIGEST_COLOR,
+            footer: { text: "OHSU RN Job Monitor" },
+          },
+        ],
         allowed_mentions: { parse: [] },
       },
     ];
