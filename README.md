@@ -5,12 +5,13 @@
 ## Current openings
 
 <!-- OHSU-JOBS:START -->
-**2 current openings**
+**3 current openings**
 
 | Position | Location | Department | Matched search | Requisition |
 | --- | --- | --- | --- | --- |
 | [RN, Behavioral Health](https://nursingcareers-ohsu.icims.com/jobs/40665/rn%2c-behavioral-health/job) | US-OR-Portland | Department of Psychiatry | RN Resident | 2026-40665 |
 | [RN, Behavioral Health](https://nursingcareers-ohsu.icims.com/jobs/40664/rn%2c-behavioral-health/job) | US-OR-Portland | Department of Psychiatry | RN Resident | 2026-40664 |
+| [RN, Pediatric Intensive Care Unit, New Graduate](https://nursingcareers-ohsu.icims.com/jobs/41582/rn%2c-pediatric-intensive-care-unit%2c-new-graduate/job) | US-OR-Portland | Pediatric Intensive Care Unit | RN New Grad | 2026-41582 |
 
 [RN Resident](https://nursingcareers-ohsu.icims.com/jobs/search?searchKeyword=RN%20Resident) | [RN New Grad](https://nursingcareers-ohsu.icims.com/jobs/search?searchKeyword=RN%20New%20Grad)
 <!-- OHSU-JOBS:END -->
